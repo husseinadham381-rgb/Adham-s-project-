@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>متجر الملابس الاحترافي</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Cairo:wght=400;600;700&display=swap');
+        body { font-family: 'Cairo', sans-serif; }
+    </style>
+</head>
+<body class="bg-slate-50 text-slate-800">
+
+    <header class="bg-white border-b p-4 shadow-sm sticky top-0 z-40">
+        <div class="max-w-6xl mx-auto flex justify-between items-center">
+            <h1 class="text-xl font-bold text-blue-600">🛍️ متجر الأناقة</h1>
+            <button onclick="toggleCart()" class="bg-blue-600 text-white px-4 py-2 rounded-xl text-sm font-bold">🛒 السلة (<span id="cart-count">0</span>)</button>
+        </div>
+    </header>
+
+    <main class="max-w-6xl mx-auto px-4 py-10">
+        <div id="products-container" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-8">
+            </div>
+    </main>
+
+    <div id="cart-modal" class="fixed inset-0 bg-slate-900/60 hidden justify-end z-50">
+        <div class="bg-white w-full max-w-md h-full p-6 flex flex-col justify-between shadow-2xl">
+            <div>
+                <h3 class="text-lg font-bold border-b pb-4 mb-4">🛒 سلة المشتريات</h3>
+                <div id="cart-items" class="space-y-3 overflow-y-auto max-h-[50vh]"></div>
+            </div>
+            <div class="space-y-4 border-t pt-4">
+                <input type="text" id="client-name" placeholder="اسم المستلم" class="w-full bg-slate-50 border p-2.5 rounded-xl text-sm">
+                <input type="text" id="client-address" placeholder="العنوان ورقم التليفون" class="w-full bg-slate-50 border p-2.5 rounded-xl text-sm">
+                <div class="flex justify-between font-bold bg-slate-50 p-3 rounded-xl border">
+                    <span>الإجمالي:</span>
+                    <span id="cart-total" class="text-blue-600">0 جنيه</span>
+                </div>
+                <button onclick="checkout()" class="w-full bg-green-600 text-white py-3 rounded-xl font-bold">💬 طلب عبر الواتساب</button>
+                <button onclick="toggleCart()" class="w-full bg-slate-100 text-slate-600 py-2 rounded-xl text-xs font-bold">إغلاق السلة</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // 📱 رقم الواتساب اللي هيستلم الطلبات
+        const MY_WHATSAPP = "201012345678"; 
+
+        // 📦 منتجات المحل ثابتة ومضمونة ومستحيل تقع
+        const products = [
+            { 
+                title: "تيشرت أوفر سايز أسود", 
+                price: 350, 
+                desc: "قطن 100% خامة ممتازة وثقيلة", 
+                img: "https://images.unsplash.com/photo-1521572267360-ee0c2909d518?w=500" 
+            },
+            { 
+                title: "بنطلون كارجو زيتوني", 
+                price: 450, 
+                desc: "مريح جداً بجيوب جانبية عصرية", 
+                img: "https://images.unsplash.com/photo-1542272604-787c3835535d?w=500" 
+            },
+            { 
+                title: "قميص كلاسيك كحلي", 
+                price: 390, 
+                desc: "خامة مستوردة تنفع للمناسبات", 
+                img: "https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?w=500" 
+            }
+        ];
+
+        let cart = [];
+
+        function loadStore() {
+            const container = document.getElementById('products-container');
+            container.innerHTML = '';
+            products.forEach((p) => {
+                container.innerHTML += `
+                    <div class="bg-white rounded-2xl border p-4 shadow-sm flex flex-col justify-between hover:shadow-md transition">
+                        <img src="${p.img}" class="w-full h-44 object-cover rounded-xl mb-3" onerror="this.src='https://images.unsplash.com/photo-1521572267360-ee0c2909d518?w=500'">
+                        <div>
+                            <h4 class="font-bold text-slate-900">${p.title}</h4>
+                            <p class="text-slate-500 text-xs my-1">${p.desc}</p>
+                            <p class="text-blue-600 font-bold mb-3">${p.price} جنيه</p>
+                        </div>
+                        <button onclick="addToCart('${p.title}', ${p.price})" class="w-full bg-slate-950 text-white py-2 rounded-xl text-xs font-bold">إضافة للسلة</button>
+                    </div>`;
+            });
+        }
+
+        function toggleCart() { document.getElementById('cart-modal').classList.toggle('hidden'); }
+        function addToCart(name, price) { cart.push({ name, price }); document.getElementById('cart-count').innerText = cart.length; updateCartUI(); }
+        
+        function updateCartUI() {
+            const itemsContainer = document.getElementById('cart-items'); itemsContainer.innerHTML = ''; let total = 0;
+            cart.forEach((item) => { total += item.price; itemsContainer.innerHTML += `<div class="flex justify-between items-center bg-slate-50 p-2 rounded-lg text-sm border"><p class="font-bold">${item.name}</p><span class="text-blue-600 font-bold">${item.price} ج</span></div>`; });
+            document.getElementById('cart-total').innerText = total + ' جنيه';
+        }
+        
+        function checkout() {
+            const name = document.getElementById('client-name').value.trim();
+            const address = document.getElementById('client-address').value.trim();
+            if(!name || !address || cart.length === 0) { alert('املأ البيانات أولاً!'); return; }
+            let itemsText = cart.map(item => `- ${item.name} (${item.price} ج)`).join('\n');
+            let total = document.getElementById('cart-total').innerText;
+            let message = `🛒 *طلب جديد من الموقع*\n\n👤 *الاسم:* ${name}\n📍 *العنوان:* ${address}\n\n📦 *المنتجات:*\n${itemsText}\n\n💰 *الإجمالي:* ${total}`;
+            window.open(`https://wa.me/${MY_WHATSAPP}?text=${encodeURIComponent(message)}`, '_blank');
+        }
+        document.addEventListener("DOMContentLoaded", loadStore);
+    </script>
+</body>
+</html>
