@@ -12,16 +12,30 @@
 </head>
 <body class="bg-slate-50 text-slate-800">
 
+    <script>
+        // ⚙️ إعدادات الحساب السحابي والباسورد
+        const MASTER_KEY = "$2a$10$KwBzIzoz05mXy34QmRKwfu.VDGLGHXkuRH2x1TtP8bn9W9HmZC7Sa"; 
+        const MY_WHATSAPP = "201012345678"; 
+        const ADMIN_PASSWORD = "A7AA"; // الباسورد بتاعتك جاهزة
+
+        // إدارة رابط المخزن تلقائياً عند أول حفظ
+        let BIN_URL = localStorage.getItem('automated_store_bin_url') || "";
+    </script>
+
     <header class="bg-white border-b p-4 shadow-sm sticky top-0 z-40">
         <div class="max-w-6xl mx-auto flex justify-between items-center">
             <h1 class="text-xl font-bold text-blue-600">🛍️ متجر الأناقة</h1>
-            <button onclick="toggleCart()" class="bg-blue-600 text-white px-4 py-2 rounded-xl text-sm font-bold">🛒 السلة (<span id="cart-count">0</span>)</button>
+            <div class="flex gap-2">
+                <button onclick="showPasswordModal()" class="bg-slate-100 text-slate-700 px-3 py-2 rounded-xl text-xs font-bold">⚙️ لوحة التحكم</button>
+                <button onclick="toggleCart()" class="bg-blue-600 text-white px-4 py-2 rounded-xl text-sm font-bold">🛒 السلة (<span id="cart-count">0</span>)</button>
+            </div>
         </div>
     </header>
 
     <main class="max-w-6xl mx-auto px-4 py-10">
         <div id="products-container" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-8">
-            </div>
+            <div class="text-center col-span-full py-10 text-slate-400" id="loading-text">جاري تحميل المنتجات... ⏳</div>
+        </div>
     </main>
 
     <div id="cart-modal" class="fixed inset-0 bg-slate-900/60 hidden justify-end z-50">
@@ -43,37 +57,67 @@
         </div>
     </div>
 
+    <div id="password-modal" class="fixed inset-0 bg-slate-900/60 hidden items-center justify-center z-50 p-4">
+        <div class="bg-white w-full max-w-sm rounded-2xl p-6 text-center shadow-xl">
+            <h3 class="text-lg font-bold mb-4">🔐 دخول صاحب المحل</h3>
+            <input type="password" id="admin-pass-input" placeholder="••••••••" class="w-full p-3 border rounded-xl mb-4 text-center font-bold">
+            <div class="flex gap-2">
+                <button onclick="checkAdminPassword()" class="flex-1 bg-blue-600 text-white py-2 rounded-xl font-bold">دخول</button>
+                <button onclick="closePasswordModal()" class="flex-1 bg-slate-100 text-slate-700 py-2 rounded-xl font-bold">إلغاء</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="admin-modal" class="fixed inset-0 bg-slate-900/60 hidden items-center justify-center z-50 p-4">
+        <div class="bg-white w-full max-w-lg rounded-2xl p-6 shadow-2xl max-h-[70vh] overflow-y-auto">
+            <div class="flex justify-between items-center border-b pb-3 mb-4">
+                <h3 class="text-lg font-bold">🛠️ إدارة منتجات المتجر</h3>
+                <button onclick="closeAdmin()" class="text-xl font-bold text-slate-400">✕</button>
+            </div>
+            <button onclick="addNewProductSlot()" class="w-full bg-indigo-50 text-indigo-600 py-2.5 rounded-xl font-bold text-xs border border-dashed border-indigo-200 mb-4">➕ إضافة منتج جديد</button>
+            <div id="admin-fields-container" class="space-y-6"></div>
+            <button type="button" onclick="saveAdminChanges()" id="save-btn" class="w-full bg-blue-600 text-white py-3 rounded-xl font-bold mt-6 shadow-lg">💾 حفظ وتحديث المتجر عند كل الناس</button>
+        </div>
+    </div>
+
     <script>
-        // 📱 رقم الواتساب اللي هيستلم الطلبات
-        const MY_WHATSAPP = "201012345678"; 
-
-        // 📦 منتجات المحل ثابتة ومضمونة ومستحيل تقع
-        const products = [
-            { 
-                title: "تيشرت أوفر سايز أسود", 
-                price: 350, 
-                desc: "قطن 100% خامة ممتازة وثقيلة", 
-                img: "https://images.unsplash.com/photo-1521572267360-ee0c2909d518?w=500" 
-            },
-            { 
-                title: "بنطلون كارجو زيتوني", 
-                price: 450, 
-                desc: "مريح جداً بجيوب جانبية عصرية", 
-                img: "https://images.unsplash.com/photo-1542272604-787c3835535d?w=500" 
-            },
-            { 
-                title: "قميص كلاسيك كحلي", 
-                price: 390, 
-                desc: "خامة مستوردة تنفع للمناسبات", 
-                img: "https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?w=500" 
-            }
-        ];
-
+        // 📦 البداية بمنتج واحد تجريبي زي ما طلبت
+        let defaultProduct = [{ title: "تيشرت أوفر سايز أسود", price: 350, desc: "قطن 100% خامة ممتازة وثقيلة", img: "https://images.unsplash.com/photo-1521572267360-ee0c2909d518?w=500" }];
+        let products = [];
         let cart = [];
 
-        function loadStore() {
+        function initStore() {
+            if (!BIN_URL) {
+                products = defaultProduct;
+                renderProducts();
+            } else {
+                loadProductsFromServer();
+            }
+        }
+
+        function loadProductsFromServer() {
+            fetch(BIN_URL, { method: "GET", headers: { "X-Master-Key": MASTER_KEY } })
+            .then(res => res.json())
+            .then(data => {
+                products = data.record || defaultProduct;
+                renderProducts();
+            })
+            .catch(err => {
+                products = defaultProduct;
+                renderProducts();
+            });
+        }
+
+        function renderProducts() {
             const container = document.getElementById('products-container');
             container.innerHTML = '';
+            const loadingText = document.getElementById('loading-text');
+            if(loadingText) loadingText.remove();
+
+            if(products.length === 0) {
+                container.innerHTML = '<div class="text-center col-span-full py-10 text-slate-400">المتجر فارغ حالياً، افتح لوحة التحكم وأضف منتجاتك! 🚀</div>';
+                return;
+            }
             products.forEach((p) => {
                 container.innerHTML += `
                     <div class="bg-white rounded-2xl border p-4 shadow-sm flex flex-col justify-between hover:shadow-md transition">
@@ -88,6 +132,85 @@
             });
         }
 
+        function showPasswordModal() { document.getElementById('password-modal').classList.remove('hidden'); document.getElementById('password-modal').classList.add('flex'); }
+        function closePasswordModal() { document.getElementById('password-modal').classList.add('hidden'); }
+
+        function checkAdminPassword() {
+            if (document.getElementById('admin-pass-input').value.trim() === ADMIN_PASSWORD) {
+                closePasswordModal();
+                document.getElementById('admin-modal').classList.remove('hidden');
+                document.getElementById('admin-modal').classList.add('flex');
+                renderAdminForm();
+            } else { alert("رمز الدخول خاطئ!"); }
+        }
+
+        function renderAdminForm() {
+            const formContainer = document.getElementById('admin-fields-container');
+            formContainer.innerHTML = '';
+            products.forEach((p, index) => {
+                formContainer.innerHTML += `
+                    <div class="product-slot bg-slate-50 p-3 rounded-xl border space-y-2 relative" data-index="${index}">
+                        <button type="button" onclick="deleteSlot(${index})" class="absolute top-3 left-3 bg-red-50 text-red-500 text-xs px-2 py-1 rounded-lg">🗑️ حذف</button>
+                        <h4 class="font-bold text-blue-600 text-xs">📦 منتج رقم ${index + 1}</h4>
+                        <input type="text" id="title-${index}" value="${p.title}" class="w-full p-2 border rounded-lg text-sm" placeholder="اسم المنتج">
+                        <input type="number" id="price-${index}" value="${p.price}" class="w-full p-2 border rounded-lg text-sm" placeholder="السعر">
+                        <input type="text" id="desc-${index}" value="${p.desc}" class="w-full p-2 border rounded-lg text-sm" placeholder="الوصف">
+                        <input type="text" id="edit-img-${index}" value="${p.img}" class="w-full p-2 border rounded-lg text-sm" placeholder="رابط صورة المنتج">
+                    </div>`;
+            });
+        }
+
+        function addNewProductSlot() {
+            products.push({ title: "منتج جديد", price: 100, desc: "الوصف هنا", img: "https://images.unsplash.com/photo-1521572267360-ee0c2909d518?w=500" });
+            renderAdminForm();
+        }
+
+        function deleteSlot(index) { products.splice(index, 1); renderAdminForm(); }
+
+        function saveAdminChanges() {
+            const saveBtn = document.getElementById('save-btn');
+            saveBtn.disabled = true;
+            saveBtn.innerText = "جاري المزامنة السحابية... ⏳";
+
+            let updatedList = [];
+            const slots = document.querySelectorAll('.product-slot');
+            slots.forEach((slot) => {
+                const idx = slot.getAttribute('data-index');
+                const titleVal = document.getElementById(`title-${idx}`).value.trim();
+                const priceVal = Number(document.getElementById(`price-${idx}`).value);
+                const descVal = document.getElementById(`desc-${idx}`).value.trim();
+                const imgVal = document.getElementById(`edit-img-${idx}`).value.trim();
+                if(titleVal) { updatedList.push({ title: titleVal, price: priceVal, desc: descVal, img: imgVal }); }
+            });
+
+            // لو أول مرة بنحفظ، هنعمل الـ Bin أوتوماتيك
+            let method = BIN_URL ? "PUT" : "POST";
+            let url = BIN_URL ? BIN_URL : "https://api.jsonbin.io/v3/b";
+
+            let headers = { "Content-Type": "application/json", "X-Master-Key": MASTER_KEY };
+            if (method === "POST") headers["X-Bin-Private"] = "false";
+
+            fetch(url, {
+                method: method,
+                headers: headers,
+                body: JSON.stringify(updatedList)
+            })
+            .then(res => res.json())
+            .then(data => {
+                if (method === "POST" && data.metadata && data.metadata.id) {
+                    BIN_URL = `https://api.jsonbin.io/v3/b/${data.metadata.id}`;
+                    localStorage.setItem('automated_store_bin_url', BIN_URL);
+                }
+                products = updatedList;
+                renderProducts();
+                document.getElementById('admin-modal').classList.add('hidden');
+                alert("تم التحديث بنجاح! التعديلات هتظهر عند كل الناس فوراً 🎉");
+            })
+            .catch(err => alert("حدث خطأ أثناء الاتصال بالسيرفر."))
+            .finally(() => { saveBtn.disabled = false; saveBtn.innerText = "💾 حفظ وتحديث المتجر عند كل الناس"; });
+        }
+
+        function closeAdmin() { document.getElementById('admin-modal').classList.add('hidden'); }
         function toggleCart() { document.getElementById('cart-modal').classList.toggle('hidden'); }
         function addToCart(name, price) { cart.push({ name, price }); document.getElementById('cart-count').innerText = cart.length; updateCartUI(); }
         
@@ -103,10 +226,11 @@
             if(!name || !address || cart.length === 0) { alert('املأ البيانات أولاً!'); return; }
             let itemsText = cart.map(item => `- ${item.name} (${item.price} ج)`).join('\n');
             let total = document.getElementById('cart-total').innerText;
-            let message = `🛒 *طلب جديد من الموقع*\n\n👤 *الاسم:* ${name}\n📍 *العنوان:* ${address}\n\n📦 *المنتجات:*\n${itemsText}\n\n💰 *الإجمالي:* ${total}`;
+            let message = `🛒 *طلب جديد*\n\n👤 *الاسم:* ${name}\n📍 *العنوان:* ${address}\n\n📦 *المنتجات:*\n${itemsText}\n\n💰 *الإجمالي:* ${total}`;
             window.open(`https://wa.me/${MY_WHATSAPP}?text=${encodeURIComponent(message)}`, '_blank');
         }
-        document.addEventListener("DOMContentLoaded", loadStore);
+
+        document.addEventListener("DOMContentLoaded", initStore);
     </script>
 </body>
 </html>
