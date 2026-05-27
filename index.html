@@ -12,16 +12,6 @@
 </head>
 <body class="bg-slate-50 text-slate-800">
 
-    <script>
-        // ⚙️ إعدادات الحساب السحابي والباسورد
-        const MASTER_KEY = "$2a$10$KwBzIzoz05mXy34QmRKwfu.VDGLGHXkuRH2x1TtP8bn9W9HmZC7Sa"; 
-        const MY_WHATSAPP = "201012345678"; 
-        const ADMIN_PASSWORD = "A7AA"; // الباسورد بتاعتك جاهزة
-
-        // إدارة رابط المخزن تلقائياً عند أول حفظ
-        let BIN_URL = localStorage.getItem('automated_store_bin_url') || "";
-    </script>
-
     <header class="bg-white border-b p-4 shadow-sm sticky top-0 z-40">
         <div class="max-w-6xl mx-auto flex justify-between items-center">
             <h1 class="text-xl font-bold text-blue-600">🛍️ متجر الأناقة</h1>
@@ -34,8 +24,7 @@
 
     <main class="max-w-6xl mx-auto px-4 py-10">
         <div id="products-container" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-8">
-            <div class="text-center col-span-full py-10 text-slate-400" id="loading-text">جاري تحميل المنتجات... ⏳</div>
-        </div>
+            </div>
     </main>
 
     <div id="cart-modal" class="fixed inset-0 bg-slate-900/60 hidden justify-end z-50">
@@ -76,43 +65,30 @@
             </div>
             <button onclick="addNewProductSlot()" class="w-full bg-indigo-50 text-indigo-600 py-2.5 rounded-xl font-bold text-xs border border-dashed border-indigo-200 mb-4">➕ إضافة منتج جديد</button>
             <div id="admin-fields-container" class="space-y-6"></div>
-            <button type="button" onclick="saveAdminChanges()" id="save-btn" class="w-full bg-blue-600 text-white py-3 rounded-xl font-bold mt-6 shadow-lg">💾 حفظ وتحديث المتجر عند كل الناس</button>
+            <button type="button" onclick="saveAdminChanges()" class="w-full bg-blue-600 text-white py-3 rounded-xl font-bold mt-6 shadow-lg">💾 حفظ التعديلات فوراً</button>
         </div>
     </div>
 
     <script>
-        // 📦 البداية بمنتج واحد تجريبي زي ما طلبت
-        let defaultProduct = [{ title: "تيشرت أوفر سايز أسود", price: 350, desc: "قطن 100% خامة ممتازة وثقيلة", img: "https://images.unsplash.com/photo-1521572267360-ee0c2909d518?w=500" }];
-        let products = [];
+        // ⚙️ الإعدادات الأساسية
+        const MY_WHATSAPP = "201012345678"; // رقم الواتساب بتاعك هنا
+        const ADMIN_PASSWORD = "A7AA"; // الباسورد بتاعتك
+
+        // منتج واحد تجريبي في البداية زي ما طلبت
+        const defaultProduct = [{ 
+            title: "تيشرت أوفر سايز أسود", 
+            price: 350, 
+            desc: "قطن 100% خامة ممتازة وثقيلة", 
+            img: "https://images.unsplash.com/photo-1521572267360-ee0c2909d518?w=500" 
+        }];
+
+        // جلب المنتجات من الذاكرة المحلية أو تحميل المنتج التجريبي
+        let products = JSON.parse(localStorage.getItem('local_store_products')) || defaultProduct;
         let cart = [];
-
-        function initStore() {
-            if (!BIN_URL) {
-                products = defaultProduct;
-                renderProducts();
-            } else {
-                loadProductsFromServer();
-            }
-        }
-
-        function loadProductsFromServer() {
-            fetch(BIN_URL, { method: "GET", headers: { "X-Master-Key": MASTER_KEY } })
-            .then(res => res.json())
-            .then(data => {
-                products = data.record || defaultProduct;
-                renderProducts();
-            })
-            .catch(err => {
-                products = defaultProduct;
-                renderProducts();
-            });
-        }
 
         function renderProducts() {
             const container = document.getElementById('products-container');
             container.innerHTML = '';
-            const loadingText = document.getElementById('loading-text');
-            if(loadingText) loadingText.remove();
 
             if(products.length === 0) {
                 container.innerHTML = '<div class="text-center col-span-full py-10 text-slate-400">المتجر فارغ حالياً، افتح لوحة التحكم وأضف منتجاتك! 🚀</div>';
@@ -168,10 +144,6 @@
         function deleteSlot(index) { products.splice(index, 1); renderAdminForm(); }
 
         function saveAdminChanges() {
-            const saveBtn = document.getElementById('save-btn');
-            saveBtn.disabled = true;
-            saveBtn.innerText = "جاري المزامنة السحابية... ⏳";
-
             let updatedList = [];
             const slots = document.querySelectorAll('.product-slot');
             slots.forEach((slot) => {
@@ -183,31 +155,11 @@
                 if(titleVal) { updatedList.push({ title: titleVal, price: priceVal, desc: descVal, img: imgVal }); }
             });
 
-            // لو أول مرة بنحفظ، هنعمل الـ Bin أوتوماتيك
-            let method = BIN_URL ? "PUT" : "POST";
-            let url = BIN_URL ? BIN_URL : "https://api.jsonbin.io/v3/b";
-
-            let headers = { "Content-Type": "application/json", "X-Master-Key": MASTER_KEY };
-            if (method === "POST") headers["X-Bin-Private"] = "false";
-
-            fetch(url, {
-                method: method,
-                headers: headers,
-                body: JSON.stringify(updatedList)
-            })
-            .then(res => res.json())
-            .then(data => {
-                if (method === "POST" && data.metadata && data.metadata.id) {
-                    BIN_URL = `https://api.jsonbin.io/v3/b/${data.metadata.id}`;
-                    localStorage.setItem('automated_store_bin_url', BIN_URL);
-                }
-                products = updatedList;
-                renderProducts();
-                document.getElementById('admin-modal').classList.add('hidden');
-                alert("تم التحديث بنجاح! التعديلات هتظهر عند كل الناس فوراً 🎉");
-            })
-            .catch(err => alert("حدث خطأ أثناء الاتصال بالسيرفر."))
-            .finally(() => { saveBtn.disabled = false; saveBtn.innerText = "💾 حفظ وتحديث المتجر عند كل الناس"; });
+            products = updatedList;
+            localStorage.setItem('local_store_products', JSON.stringify(products));
+            renderProducts();
+            document.getElementById('admin-modal').classList.add('hidden');
+            alert("تم حفظ التعديلات بنجاح! 🎉");
         }
 
         function closeAdmin() { document.getElementById('admin-modal').classList.add('hidden'); }
@@ -226,11 +178,12 @@
             if(!name || !address || cart.length === 0) { alert('املأ البيانات أولاً!'); return; }
             let itemsText = cart.map(item => `- ${item.name} (${item.price} ج)`).join('\n');
             let total = document.getElementById('cart-total').innerText;
-            let message = `🛒 *طلب جديد*\n\n👤 *الاسم:* ${name}\n📍 *العنوان:* ${address}\n\n📦 *المنتجات:*\n${itemsText}\n\n💰 *الإجمالي:* ${total}`;
+            let message = `🛒 *طلب جديد من المتجر*\n\n👤 *الاسم:* ${name}\n📍 *العنوان ورقم التليفون:* ${address}\n\n📦 *المنتجات:*\n${itemsText}\n\n💰 *الإجمالي:* ${total}`;
             window.open(`https://wa.me/${MY_WHATSAPP}?text=${encodeURIComponent(message)}`, '_blank');
         }
 
-        document.addEventListener("DOMContentLoaded", initStore);
+        // تشغيل المتجر فوراً أول ما الصفحة تفتح
+        document.addEventListener("DOMContentLoaded", renderProducts);
     </script>
 </body>
 </html>
